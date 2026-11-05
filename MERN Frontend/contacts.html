@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Secret Shop Collector Dashboard - Browse, add, and manage your figures." />
+  <title>Secret Shop | Collector Catalog</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #24243a;
+      --muted: #69697c;
+      --purple: #6d4be8;
+      --purple-dark: #5234c3;
+      --paper: #ffffff;
+      --wash: #f7f5ff;
+      --card-border: #eeedf3;
+      --border-subtle: #e6e2f5;
+      --danger: #b42318;
+      --danger-bg: #fee4e2;
+      --success: #027a48;
+      --success-bg: #d1fadf;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #faf9fd;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    a { color: inherit; text-decoration: none; }
+    header {
+      background: var(--paper);
+      border-bottom: 1px solid var(--card-border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav {
+      width: min(1180px, 92%);
+      margin: auto;
+      min-height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .brand {
+      font-size: 1.45rem;
+      font-weight: 850;
+      letter-spacing: -.06em;
+      white-space: nowrap;
+    }
+    .brand span { color: var(--purple); }
+    .nav-user {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .user-greeting {
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+    .user-greeting strong {
+      color: var(--ink);
+    }
+    .btn-logout {
+      padding: 8px 14px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      background: var(--paper);
+      color: var(--ink);
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-logout:hover {
+      border-color: var(--danger);
+      color: var(--danger);
+      background: var(--danger-bg);
+    }
+
+    /* Layout Container */
+    .container {
+      width: min(1180px, 92%);
+      margin: 32px auto 60px;
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 32px;
+      align-items: start;
+    }
+
+    /* Main Catalog Area */
+    .catalog-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .catalog-header h1 {
+      margin: 0;
+      font-size: 1.85rem;
+      letter-spacing: -.04em;
+    }
+    .search-filter-bar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .search-filter-bar input,
+    .search-filter-bar select {
+      padding: 10px 14px;
+      border: 1px solid #dedbe9;
+      border-radius: 8px;
+      font: inherit;
+      font-size: 0.9rem;
+      background: var(--paper);
+    }
+    .search-filter-bar input:focus,
+    .search-filter-bar select:focus {
+      outline: none;
+      border-color: var(--purple);
+    }
+
+    /* Item Cards Grid */
+    .items-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 20px;
+    }
+    .item-card {
+      background: var(--paper);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.18s, box-shadow 0.18s;
+    }
+    .item-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 24px rgba(41, 32, 68, 0.06);
+    }
+    .item-icon {
+      font-size: 2.8rem;
+      line-height: 1;
+      margin-bottom: 14px;
+    }
+    .item-card h3 {
+      margin: 0 0 6px;
+      font-size: 1.1rem;
+      letter-spacing: -.02em;
+    }
+    .item-type {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 3px 8px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+    .type-figure {
+      background: #ede8ff;
+      color: var(--purple-dark);
+    }
+    .type-model {
+      background: #e0f2fe;
+      color: #0369a1;
+    }
+    .item-desc {
+      margin: 0 0 16px;
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+    .btn-add {
+      width: 100%;
+      padding: 10px 14px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--purple);
+      color: #fff;
+      font: inherit;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-add:hover {
+      background: var(--purple-dark);
+    }
+
+    /* Side Panel: User's Active Collection */
+    .collection-panel {
+      background: var(--paper);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 10px 25px rgba(41, 32, 68, 0.04);
+      position: sticky;
+      top: 96px;
+    }
+    .collection-panel h2 {
+      margin: 0 0 4px;
+      font-size: 1.3rem;
+      letter-spacing: -.03em;
+    }
+    .collection-panel p.subhead {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+    .panel-feedback {
+      min-height: 1.2em;
+      font-size: 0.85rem;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+    .panel-feedback.success { color: var(--success); }
+    .panel-feedback.error { color: var(--danger); }
+
+    /* Custom Item Submission Form */
+    .custom-add-box {
+      background: var(--wash);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 20px;
+    }
+    .custom-add-box summary {
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--purple-dark);
+      user-select: none;
+    }
+    .custom-add-form {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .custom-add-form input,
+    .custom-add-form select {
+      padding: 8px 10px;
+      border: 1px solid #dedbe9;
+      border-radius: 6px;
+      font: inherit;
+      font-size: 0.85rem;
+      background: #fff;
+    }
+    .custom-add-form button {
+      padding: 9px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--ink);
+      color: #fff;
+      font: inherit;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* Tabular User Collection */
+    .table-responsive {
+      max-height: 340px;
+      overflow-y: auto;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      margin-top: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+      text-align: left;
+    }
+    th {
+      background: var(--wash);
+      padding: 9px 10px;
+      font-weight: 700;
+      border-bottom: 1px solid var(--border-subtle);
+      position: sticky;
+      top: 0;
+    }
+    td {
+      padding: 9px 10px;
+      border-bottom: 1px solid #f0edf8;
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    .btn-del {
+      border: 0;
+      background: none;
+      color: var(--danger);
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 0.85rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .btn-del:hover {
+      background: var(--danger-bg);
+    }
+    .empty-state {
+      padding: 24px 10px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    @media (max-width: 900px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+      .collection-panel {
+        position: static;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <nav class="nav" aria-label="Main navigation">
+      <a class="brand" href="contacts.html">Secret <span>Shop</span></a>
+      <div class="nav-user">
+        <div class="user-greeting" id="userName">
+          <span>Signed in as <strong>Collector</strong></span>
+        </div>
+        <button class="btn-logout" type="button" onclick="doLogout()">Log out</button>
+      </div>
+    </nav>
+  </header>
+
+  <div class="container">
+    <!-- LEFT: Figure & Model Catalog Section -->
+    <main>
+      <div class="catalog-header">
+        <div>
+          <h1>Collector Catalog</h1>
+          <span style="font-size: 0.9rem; color: var(--muted);">Select items to link directly to your personal shelf</span>
+        </div>
+        <div class="search-filter-bar">
+          <input type="text" id="catalogSearch" placeholder="Search models or figures..." oninput="filterCatalog()" />
+          <select id="typeFilter" onchange="filterCatalog()">
+            <option value="ALL">All Categories</option>
+            <option value="Figure">Action Figures</option>
+            <option value="Model">Model Kits</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="items-grid" id="catalogGrid">
+        <!-- Catalog cards rendered by JS -->
+      </div>
+    </main>
+
+    <!-- RIGHT: User's Live Database-Synced Shelf -->
+    <aside class="collection-panel" aria-labelledby="shelfHeading">
+      <h2 id="shelfHeading">Your Saved Shelf</h2>
+      <p class="subhead">Interactive record storage for your account</p>
+
+      <div id="shelfFeedback" class="panel-feedback" role="alert"></div>
+
+      <!-- Option to add custom Figure or Model -->
+      <details class="custom-add-box">
+        <summary>+ Add Custom Entry</summary>
+        <form class="custom-add-form" onsubmit="event.preventDefault(); addCustomItem();">
+          <input type="text" id="customName" placeholder="Item Name (e.g. RX-78-2)" required />
+          <select id="customType" required>
+            <option value="Figure">Action Figure</option>
+            <option value="Model">Model Kit</option>
+          </select>
+          <input type="text" id="customDetail" placeholder="Scale / Manufacturer (e.g. 1/144 Bandai)" />
+          <button type="submit">Add to Collection</button>
+        </form>
+      </details>
+
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Category</th>
+              <th style="text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody id="collectionTableBody">
+            <tr>
+              <td colspan="3" class="empty-state">Loading your collection...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </aside>
+  </div>
+
+  <script src="js/code.js"></script>
+  <script>
+    // Catalog definitions available for one-click assignment to account
+    const catalogData = [
+      { id: 'cat-1', name: 'Cyber Rogue', type: 'Figure', desc: '1/12 articulated synthetic human operative with dual accessories.', icon: '🦸' },
+      { id: 'cat-2', name: 'Astra Heavy Mech', type: 'Model', desc: '1/100 snap-fit multi-colored armor kit with articulated joints.', icon: '🤖' },
+      { id: 'cat-3', name: 'Galactic Cruiser V2', type: 'Model', desc: 'Detailed starship display model with translucent thruster parts.', icon: '🚀' },
+      { id: 'cat-4', name: 'Valkyrie Blade Unit', type: 'Figure', desc: 'High-tier collectible heroine with chrome finish and flight wings.', icon: '🦸‍♀️' },
+      { id: 'cat-5', name: 'Titan Recon Walker', type: 'Model', desc: 'Desert camouflaged dual-pilot robotic exploration kit.', icon: '🦾' },
+      { id: 'cat-6', name: 'Retro Neon Android', type: 'Figure', desc: 'Vintage-styled posable metallic android with energy sabers.', icon: '⚡' }
+    ];
+
+    function renderCatalog(items) {
+      const grid = document.getElementById('catalogGrid');
+      if (!grid) return;
+      if (items.length === 0) {
+        grid.innerHTML = '<div style="color: var(--muted); grid-column: 1/-1;">No models or figures match your criteria.</div>';
+        return;
+      }
+      grid.innerHTML = items.map(item => `
+        <div class="item-card">
+          <div>
+            <div class="item-icon" aria-hidden="true">${item.icon}</div>
+            <span class="item-type ${item.type === 'Figure' ? 'type-figure' : 'type-model'}">${item.type}</span>
+            <h3>${item.name}</h3>
+            <p class="item-desc">${item.desc}</p>
+          </div>
+          <button type="button" class="btn-add" onclick="addItemToAccount('${item.name}', '${item.type}', '${item.desc}')">
+            + Add to Shelf
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function filterCatalog() {
+      const query = document.getElementById('catalogSearch').value.toLowerCase().trim();
+      const typeFilter = document.getElementById('typeFilter').value;
+
+      const filtered = catalogData.filter(item => {
+        const matchesQuery = item.name.toLowerCase().includes(query) || item.desc.toLowerCase().includes(query);
+        const matchesType = (typeFilter === 'ALL') || (item.type === typeFilter);
+        return matchesQuery && matchesType;
+      });
+
+      renderCatalog(filtered);
+    }
+
+    // Interactive hooks leveraging session credentials from code.js
+    window.addEventListener('DOMContentLoaded', () => {
+      readCookie();
+      renderCatalog(catalogData);
+      loadUserCollection();
+    });
+
+    function setShelfFeedback(msg, isSuccess = true) {
+      const fb = document.getElementById('shelfFeedback');
+      if (!fb) return;
+      fb.className = `panel-feedback ${isSuccess ? 'success' : 'error'}`;
+      fb.textContent = msg;
+      setTimeout(() => { if (fb.textContent === msg) fb.textContent = ''; }, 3500);
+    }
+
+    // Handles adding pre-set catalog figures/models to user account
+    function addItemToAccount(name, type, detail) {
+      if (!userId || userId <= 0) {
+        window.location.href = 'index.html';
+        return;
+      }
+
+      const payload = {
+        action: 'add_contact', // Maps to standard LAMP manager backend record-add action
+        userId: userId,
+        name: name,
+        phone: type,           // Reusing secondary schema columns for category and detail
+        email: detail
+      };
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', urlBase, true);
+      xhr.setRequestHeader('Content-type', 'application/json; charset=UTF-8');
+      xhr.setRequestHeader('X-User-Id', userId);
+
+      xhr.onreadystatechange = function () {
+        if (this.readyState === 4) {
+          if (this.status === 200 || this.status === 201) {
+            setShelfFeedback(`"${name}" added to your account!`, true);
+            loadUserCollection();
+          } else {
+            setShelfFeedback('Failed to save to account.', false);
+          }
+        }
+      };
+      xhr.send(JSON.stringify(payload));
+    }
+
+    function addCustomItem() {
+      const name = document.getElementById('customName').value.trim();
+      const type = document.getElementById('customType').value;
+      const detail = document.getElementById('customDetail').value.trim();
+      if (!name) return;
+
+      addItemToAccount(name, type, detail);
+      document.getElementById('customName').value = '';
+      document.getElementById('customDetail').value = '';
+    }
+
+    // Fetches live user collection from backend
+    function loadUserCollection() {
+      if (!userId || userId <= 0) return;
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', urlBase, true);
+      xhr.setRequestHeader('Content-type', 'application/json; charset=UTF-8');
+
+      const payload = {
+        action: 'search_contacts',
+        userId: userId,
+        search: ''
+      };
+
+      xhr.onreadystatechange = function () {
+        if (this.readyState === 4) {
+          const tbody = document.getElementById('collectionTableBody');
+          if (this.status === 200) {
+            let res = {};
+            try { res = JSON.parse(xhr.responseText); } catch (e) { res = {}; }
+            const records = res.results || [];
+
+            if (records.length === 0) {
+              tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No figures or models added yet. Select one on the left!</td></tr>';
+              return;
+            }
+
+            tbody.innerHTML = records.map(r => `
+              <tr>
+                <td><strong>${r.name || r.FirstName || 'Item'}</strong></td>
+                <td><span class="item-type ${r.phone === 'Model' ? 'type-model' : 'type-figure'}">${r.phone || 'Figure'}</span></td>
+                <td style="text-align: right;">
+                  <button type="button" class="btn-del" onclick="deleteCollectionItem(${r.id || r.ID})">Remove</button>
+                </td>
+              </tr>
+            `).join('');
+          } else {
+            tbody.innerHTML = '<tr><td colspan="3" class="empty-state">Failed to load saved items.</td></tr>';
+          }
+        }
+      };
+      xhr.send(JSON.stringify(payload));
+    }
+
+    function deleteCollectionItem(recordId) {
+      if (!recordId) return;
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', urlBase, true);
+      xhr.setRequestHeader('Content-type', 'application/json; charset=UTF-8');
+
+      const payload = {
+        action: 'delete_contact',
+        id: recordId,
+        userId: userId
+      };
+
+      xhr.onreadystatechange = function () {
+        if (this.readyState === 4) {
+          if (this.status === 200) {
+            setShelfFeedback('Item removed from account.', true);
+            loadUserCollection();
+          } else {
+            setShelfFeedback('Could not remove item.', false);
+          }
+        }
+      };
+      xhr.send(JSON.stringify(payload));
+    }
+  </script>
+</body>
+</html>
