@@ -77,7 +77,6 @@ app.post('/api/register', async (req, res) => {
     const result = await db.collection('users').insertOne(newUser);
     res.status(201).json({
       id: result.insertedId,
-      userId: result.insertedId,
       username,
       firstName,
       lastName,
@@ -111,7 +110,6 @@ app.post('/api/login', async (req, res) => {
 
     res.status(200).json({
       id: user._id,
-      userId: user._id,
       username: user.username,
       firstName: user.firstName,
       lastName: user.lastName,

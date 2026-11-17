@@ -1,16 +1,18 @@
 import type { ReactNode } from 'react';
 import { BrowserRouter as Router, Route, Navigate, Routes } from 'react-router-dom';
 import './App.css';
+
 import AuthPage from './pages/AuthPage';
 import HomePage from './pages/HomePage';
 import CartPage from './pages/CartPage';
 import { getSession } from './utils/session';
 
+// Only shows its page to a logged-in user; everyone else goes to the login page
 function RequireLogin({ children }: { children: ReactNode }) {
   return getSession() ? children : <Navigate to="/" replace />;
 }
 
-export default function App() {
+function App() {
   return (
     <Router>
       <Routes>
@@ -22,3 +24,5 @@ export default function App() {
     </Router>
   );
 }
+
+export default App;
