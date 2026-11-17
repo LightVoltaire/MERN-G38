@@ -1,141 +1,166 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, type FormEvent } from 'react';
 import Navbar from '../components/Navbar';
+import FigureCard from '../components/FigureCard';
+import type { Figure, CartItem } from '../types/shop';
 import { getSession } from '../utils/session';
-import type { CartItem } from '../types/shop';
 
-export default function CartPage() {
-  const session = getSession();
-  const userId = session?.userId ?? '';
-  const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+export default function HomePage() {
+  const [figures, setFigures] = useState<Figure[]>([]);
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('All');
+  const [cartCount, setCartCount] = useState(0);
 
-  const [items, setItems] = useState<CartItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [checkoutMsg, setCheckoutMsg] = useState('');
+  const [name, setName] = useState('');
+  const [manufacturer, setManufacturer] = useState('');
+  const [price, setPrice] = useState('');
+  const [newCategory, setNewCategory] = useState('Anime');
+  const [stock, setStock] = useState('1');
+  const [pngFile, setPngFile] = useState<File | null>(null);
+  const [uploadMsg, setUploadMsg] = useState('');
 
-  const fetchCart = async () => {
+  const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000';
+  const userId = getSession()?.userId ?? '';
+
+  const loadFigures = async () => {
+    const params = new URLSearchParams({ search, category });
+    const res = await fetch(`${apiBase}/api/figures?${params.toString()}`);
+    if (!res.ok) {
+      setFigures([]);
+      return;
+    }
+    const data: Figure[] = await res.json();
+    setFigures(data);
+  };
+
+  const loadCartCount = async () => {
     if (!userId) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`${apiBase}/api/cart/${userId}`);
-      if (res.ok) {
-        const data: CartItem[] = await res.json();
-        setItems(data);
-      }
-    } finally {
-      setLoading(false);
+    const res = await fetch(`${apiBase}/api/cart/${userId}`);
+    if (res.ok) {
+      const items: CartItem[] = await res.json();
+      setCartCount(items.reduce((sum, item) => sum + item.quantity, 0));
     }
   };
 
   useEffect(() => {
-    fetchCart();
-  }, [userId]);
+    loadFigures();
+    loadCartCount();
+  }, [search, category]);
 
-  const handleRemove = async (figureId: string) => {
-    await fetch(`${apiBase}/api/cart/remove`, {
+  const handleAddToCart = async (figureId: string) => {
+    const res = await fetch(`${apiBase}/api/cart/add`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, figureId }),
     });
-    await fetchCart();
+
+    if (res.ok) {
+      await loadFigures();
+      await loadCartCount();
+    } else {
+      const err = await res.json();
+      alert(err.error || 'Could not add item.');
+    }
   };
 
-  const handleCheckout = async () => {
-    const res = await fetch(`${apiBase}/api/cart/checkout`, {
+  const handleListFigure = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!pngFile) return;
+
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('manufacturer', manufacturer);
+    formData.append('price', price);
+    formData.append('category', newCategory);
+    formData.append('stock', stock);
+    formData.append('userId', userId);
+    formData.append('image', pngFile);
+
+    const res = await fetch(`${apiBase}/api/figures`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId }),
+      body: formData,
     });
-    const data = await res.json();
-    setCheckoutMsg(data.message || 'Purchase completed!');
-    setItems([]);
-  };
 
-  const totalCost = items.reduce((sum, item) => sum + item.figure.price * item.quantity, 0);
-  const totalCount = items.reduce((sum, item) => sum + item.quantity, 0);
+    if (res.ok) {
+      setName('');
+      setManufacturer('');
+      setPrice('');
+      setStock('1');
+      setPngFile(null);
+      setUploadMsg('Figure listed in the grand repository!');
+      await loadFigures();
+    } else {
+      const err = await res.json();
+      setUploadMsg(err.error || 'Failed to upload figure.');
+    }
+  };
 
   return (
     <>
-      <Navbar cartCount={totalCount} />
-
-      <main className="app-container flex-grow-1">
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <h1 className="h3 fw-bold mb-0">
-            <i className="bi bi-cart3 me-2 text-primary"></i>
-            Your Shopping Cart
-          </h1>
-          <Link to="/home" className="btn btn-outline-primary btn-sm">
-            <i className="bi bi-arrow-left me-1"></i>
-            Back to Catalogue
-          </Link>
+      <Navbar cartCount={cartCount} />
+      <div className="container pb-5">
+        <div className="row g-2 mb-4">
+          <div className="col-md-8">
+            <input type="text" className="form-control" placeholder="Search action figures by name or manufacturer..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <div className="col-md-4">
+            <select className="form-select" value={category} onChange={(e) => setCategory(e.target.value)}>
+              <option value="All">All Categories</option>
+              <option value="Anime">Anime</option>
+              <option value="Marvel">Marvel</option>
+              <option value="DC">DC</option>
+              <option value="Mecha">Mecha</option>
+              <option value="Video Games">Video Games</option>
+              <option value="Retro">Retro</option>
+            </select>
+          </div>
         </div>
 
-        {checkoutMsg && (
-          <div className="alert alert-success" role="alert">
-            <i className="bi bi-check-circle-fill me-2"></i>
-            {checkoutMsg}
+        <div className="card mb-4 border-dark">
+          <div className="card-header bg-dark text-white fw-semibold">+ List Your Action Figure in the Repository</div>
+          <div className="card-body">
+            <form onSubmit={handleListFigure} className="row g-3">
+              <div className="col-md-3">
+                <input type="text" className="form-control" placeholder="Figure Name" value={name} onChange={(e) => setName(e.target.value)} required />
+              </div>
+              <div className="col-md-2">
+                <input type="text" className="form-control" placeholder="Manufacturer" value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} required />
+              </div>
+              <div className="col-md-2">
+                <input type="number" step="0.01" className="form-control" placeholder="Price ($)" value={price} onChange={(e) => setPrice(e.target.value)} required />
+              </div>
+              <div className="col-md-2">
+                <select className="form-select" value={newCategory} onChange={(e) => setNewCategory(e.target.value)}>
+                  <option value="Anime">Anime</option>
+                  <option value="Marvel">Marvel</option>
+                  <option value="DC">DC</option>
+                  <option value="Mecha">Mecha</option>
+                  <option value="Video Games">Video Games</option>
+                  <option value="Retro">Retro</option>
+                </select>
+              </div>
+              <div className="col-md-1">
+                <input type="number" min="1" className="form-control" title="Quantity available" value={stock} onChange={(e) => setStock(e.target.value)} required />
+              </div>
+              <div className="col-md-2">
+                <input type="file" accept="image/png" className="form-control" onChange={(e) => setPngFile(e.target.files?.[0] || null)} required />
+              </div>
+              <div className="col-12 d-flex justify-content-between align-items-center">
+                <small className="text-muted">Upload a transparent or crisp .PNG image of your figure.</small>
+                <button type="submit" className="btn btn-success">Publish Listing</button>
+              </div>
+            </form>
+            {uploadMsg && <div className="alert alert-info mt-3 mb-0 py-2">{uploadMsg}</div>}
           </div>
-        )}
+        </div>
 
-        {loading ? (
-          <div className="text-center py-5 text-muted">Loading cart...</div>
-        ) : items.length === 0 ? (
-          <div className="card p-5 text-center">
-            <p className="text-muted mb-3">Your shopping cart is empty.</p>
-            <div>
-              <Link to="/home" className="btn btn-primary">
-                Browse Action Figures
-              </Link>
+        <div className="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
+          {figures.map((fig) => (
+            <div className="col" key={fig._id}>
+              <FigureCard figure={fig} onAddToCart={handleAddToCart} />
             </div>
-          </div>
-        ) : (
-          <div className="card shadow-sm">
-            <div className="list-group list-group-flush">
-              {items.map(({ figure, quantity }) => (
-                <div
-                  key={figure._id}
-                  className="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-3 py-3"
-                >
-                  <div className="d-flex align-items-center gap-3">
-                    <img
-                      src={`${apiBase}${figure.imageUrl}`}
-                      alt={figure.name}
-                      className="bg-white border rounded p-1"
-                      style={{ width: '68px', height: '68px', objectFit: 'contain' }}
-                    />
-                    <div>
-                      <h6 className="mb-1 fw-bold">{figure.name}</h6>
-                      <small className="text-muted">
-                        {figure.manufacturer} • {figure.category} • Qty: {quantity}
-                      </small>
-                    </div>
-                  </div>
-
-                  <div className="d-flex align-items-center gap-3">
-                    <span className="fs-6 fw-bold">${(figure.price * quantity).toFixed(2)}</span>
-                    <button
-                      type="button"
-                      className="btn btn-outline-danger btn-sm"
-                      onClick={() => handleRemove(figure._id)}
-                    >
-                      <i className="bi bi-trash me-1"></i>
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="card-footer bg-white d-flex justify-content-between align-items-center py-3">
-              <h4 className="mb-0 fw-bold">Total: ${totalCost.toFixed(2)}</h4>
-              <button type="button" className="btn btn-success btn-lg" onClick={handleCheckout}>
-                <i className="bi bi-bag-check-fill me-2"></i>
-                Complete Purchase
-              </button>
-            </div>
-          </div>
-        )}
-      </main>
+          ))}
+        </div>
+      </div>
     </>
   );
 }
