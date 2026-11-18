@@ -1,4 +1,5 @@
-import { Figure } from '../types/shop';
+import type { Figure } from '../types/shop';
+import { buildPath } from '../utils/buildPath';
 
 interface FigureCardProps {
   figure: Figure;
@@ -6,7 +7,6 @@ interface FigureCardProps {
 }
 
 export default function FigureCard({ figure, onAddToCart }: FigureCardProps) {
-  const apiBase = import.meta.env.VITE_API_URL || '';
   const isAvailable = figure.stock > 0;
 
   return (
@@ -20,7 +20,7 @@ export default function FigureCard({ figure, onAddToCart }: FigureCardProps) {
     >
       <div className="p-3 text-center bg-white border-bottom" style={{ height: '220px' }}>
         <img
-          src={`${apiBase}${figure.imageUrl}`}
+          src={buildPath(figure.imageUrl)}
           alt={figure.name}
           className="h-100 w-auto object-fit-contain"
           style={{ maxWidth: '100%' }}

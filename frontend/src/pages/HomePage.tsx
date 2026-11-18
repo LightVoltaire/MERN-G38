@@ -1,15 +1,18 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import Navbar from '../components/Navbar';
 import FigureCard from '../components/FigureCard';
-import { Figure, CartItem } from '../types/shop';
+import type { Figure, CartItem } from '../types/shop';
+import { getSession } from '../utils/session';
+import { buildPath } from '../utils/buildPath';
 
 export default function HomePage() {
   const [figures, setFigures] = useState<Figure[]>([]);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [cartCount, setCartCount] = useState(0);
+  // Bumped after adding to the cart or listing a figure, to reload the data
+  const [refresh, setRefresh] = useState(0);
 
-  // New Figure Listing Form State
   const [name, setName] = useState('');
   const [manufacturer, setManufacturer] = useState('');
   const [price, setPrice] = useState('');
@@ -18,41 +21,43 @@ export default function HomePage() {
   const [pngFile, setPngFile] = useState<File | null>(null);
   const [uploadMsg, setUploadMsg] = useState('');
 
-  const apiBase = import.meta.env.VITE_API_URL || '';
-  const userId = localStorage.getItem('secret_shop_userId') || '';
+  const userId = getSession()?.userId ?? '';
 
-  const loadFigures = async () => {
-    const params = new URLSearchParams({ search, category });
-    const res = await fetch(`${apiBase}/api/figures?${params.toString()}`);
-    const data = await res.json();
-    setFigures(data);
-  };
-
-  const loadCartCount = async () => {
-    if (!userId) return;
-    const res = await fetch(`${apiBase}/api/cart/${userId}`);
-    if (res.ok) {
-      const items: CartItem[] = await res.json();
-      setCartCount(items.reduce((sum, item) => sum + item.quantity, 0));
-    }
-  };
-
+  // The catalogue, reloaded when the search, category, or data changes
   useEffect(() => {
-    loadFigures();
-    loadCartCount();
-  }, [search, category]);
+    // Ignore a slow response that arrives after the user has typed more
+    let stale = false;
+    const params = new URLSearchParams({ search, category });
+    fetch(buildPath(`api/figures?${params.toString()}`))
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: Figure[]) => { if (!stale) setFigures(data); })
+      .catch(() => { if (!stale) setFigures([]); });
+    return () => { stale = true; };
+  }, [search, category, refresh]);
+
+  // The number on the navbar's cart icon
+  useEffect(() => {
+    if (!userId) return;
+    let stale = false;
+    fetch(buildPath(`api/cart/${userId}`))
+      .then((res) => (res.ok ? res.json() : []))
+      .then((items: CartItem[]) => {
+        if (!stale) setCartCount(items.reduce((sum, item) => sum + item.quantity, 0));
+      })
+      .catch(() => {});
+    return () => { stale = true; };
+  }, [userId, refresh]);
 
   const handleAddToCart = async (figureId: string) => {
-    const res = await fetch(`${apiBase}/api/cart/add`, {
+    const res = await fetch(buildPath('api/cart/add'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, figureId })
+      body: JSON.stringify({ userId, figureId }),
     });
 
     if (res.ok) {
-      // Refresh catalogue immediately so 0-stock items grey out right away
-      await loadFigures();
-      await loadCartCount();
+      // Reload so the stock count (and 0-stock greying) updates right away
+      setRefresh((n) => n + 1);
     } else {
       const err = await res.json();
       alert(err.error || 'Could not add item.');
@@ -72,9 +77,9 @@ export default function HomePage() {
     formData.append('userId', userId);
     formData.append('image', pngFile);
 
-    const res = await fetch(`${apiBase}/api/figures`, {
+    const res = await fetch(buildPath('api/figures'), {
       method: 'POST',
-      body: formData
+      body: formData,
     });
 
     if (res.ok) {
@@ -84,7 +89,7 @@ export default function HomePage() {
       setStock('1');
       setPngFile(null);
       setUploadMsg('Figure listed in the grand repository!');
-      loadFigures();
+      setRefresh((n) => n + 1);
     } else {
       const err = await res.json();
       setUploadMsg(err.error || 'Failed to upload figure.');
@@ -95,23 +100,12 @@ export default function HomePage() {
     <>
       <Navbar cartCount={cartCount} />
       <div className="container pb-5">
-        {/* Search & Filter Bar */}
         <div className="row g-2 mb-4">
           <div className="col-md-8">
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Search action figures by name or manufacturer..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+            <input type="text" className="form-control" placeholder="Search action figures by name or manufacturer..." value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <div className="col-md-4">
-            <select
-              className="form-select"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            >
+            <select className="form-select" value={category} onChange={(e) => setCategory(e.target.value)}>
               <option value="All">All Categories</option>
               <option value="Anime">Anime</option>
               <option value="Marvel">Marvel</option>
@@ -123,50 +117,21 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Collapsible Form to List a User's Action Figure */}
         <div className="card mb-4 border-dark">
-          <div className="card-header bg-dark text-white fw-semibold">
-            + List Your Action Figure in the Repository
-          </div>
+          <div className="card-header bg-dark text-white fw-semibold">+ List Your Action Figure in the Repository</div>
           <div className="card-body">
             <form onSubmit={handleListFigure} className="row g-3">
               <div className="col-md-3">
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Figure Name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
+                <input type="text" className="form-control" placeholder="Figure Name" value={name} onChange={(e) => setName(e.target.value)} required />
               </div>
               <div className="col-md-2">
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Manufacturer"
-                  value={manufacturer}
-                  onChange={(e) => setManufacturer(e.target.value)}
-                  required
-                />
+                <input type="text" className="form-control" placeholder="Manufacturer" value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} required />
               </div>
               <div className="col-md-2">
-                <input
-                  type="number"
-                  step="0.01"
-                  className="form-control"
-                  placeholder="Price ($)"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  required
-                />
+                <input type="number" step="0.01" className="form-control" placeholder="Price ($)" value={price} onChange={(e) => setPrice(e.target.value)} required />
               </div>
               <div className="col-md-2">
-                <select
-                  className="form-select"
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value)}
-                >
+                <select className="form-select" value={newCategory} onChange={(e) => setNewCategory(e.target.value)}>
                   <option value="Anime">Anime</option>
                   <option value="Marvel">Marvel</option>
                   <option value="DC">DC</option>
@@ -176,37 +141,20 @@ export default function HomePage() {
                 </select>
               </div>
               <div className="col-md-1">
-                <input
-                  type="number"
-                  min="1"
-                  className="form-control"
-                  title="Quantity available"
-                  value={stock}
-                  onChange={(e) => setStock(e.target.value)}
-                  required
-                />
+                <input type="number" min="1" className="form-control" title="Quantity available" value={stock} onChange={(e) => setStock(e.target.value)} required />
               </div>
               <div className="col-md-2">
-                <input
-                  type="file"
-                  accept="image/png"
-                  className="form-control"
-                  onChange={(e) => setPngFile(e.target.files?.[0] || null)}
-                  required
-                />
+                <input type="file" accept="image/png" className="form-control" onChange={(e) => setPngFile(e.target.files?.[0] || null)} required />
               </div>
               <div className="col-12 d-flex justify-content-between align-items-center">
                 <small className="text-muted">Upload a transparent or crisp .PNG image of your figure.</small>
-                <button type="submit" className="btn btn-success">
-                  Publish Listing
-                </button>
+                <button type="submit" className="btn btn-success">Publish Listing</button>
               </div>
             </form>
             {uploadMsg && <div className="alert alert-info mt-3 mb-0 py-2">{uploadMsg}</div>}
           </div>
         </div>
 
-        {/* Catalogue Grid */}
         <div className="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
           {figures.map((fig) => (
             <div className="col" key={fig._id}>

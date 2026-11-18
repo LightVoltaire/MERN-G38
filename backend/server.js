@@ -38,13 +38,33 @@ client.connect()
   .then(() => console.log('MongoClient connected to MongoDB Atlas: FigurinesDB'))
   .catch(err => console.error('MongoClient Connection Error:', err));
 
-// Helper to normalize older DB records so frontend always gets imageUrl & stock
+// Turns whatever is stored as the picture into a path the frontend can load.
+// Records added by hand often hold just a file name ("goku.png"); those
+// files are expected in backend/uploads, which is served at /uploads.
+function toImageUrl(value) {
+  if (!value) return '';
+  if (/^https?:\/\//.test(value) || value.startsWith('/')) return value;
+  return `/uploads/${value}`;
+}
+
+// Helper to normalize older DB records so the frontend always gets the
+// fields src/types/shop.ts expects, even when some are missing or null
 function normalizeFigure(doc) {
   return {
     ...doc,
-    imageUrl: doc.imageUrl || doc.image || '',
-    stock: doc.stock !== undefined ? Number(doc.stock) : 1
+    name: doc.name || 'Unnamed figure',
+    manufacturer: doc.manufacturer || '',
+    category: doc.category || '',
+    price: Number(doc.price) || 0,
+    imageUrl: toImageUrl(doc.imageUrl || doc.image),
+    stock: doc.stock == null ? 1 : Number(doc.stock)
   };
+}
+
+// Escape characters that mean something in a regular expression, so a search
+// for "(" or "C++" matches that text instead of throwing an error
+function escapeRegex(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // ==================== AUTH ROUTES ====================
@@ -127,18 +147,21 @@ app.post('/api/login', async (req, res) => {
 // GET /api/figures?search=...&category=...
 app.get('/api/figures', async (req, res) => {
   try {
-    const { search, category } = req.query;
+    const search = String(req.query.search || '').trim();
+    const category = String(req.query.category || 'All');
     const filter = {};
 
-    if (search && search.trim() !== '') {
+    if (search) {
+      const pattern = escapeRegex(search);
       filter.$or = [
-        { name: { $regex: search.trim(), $options: 'i' } },
-        { manufacturer: { $regex: search.trim(), $options: 'i' } }
+        { name: { $regex: pattern, $options: 'i' } },
+        { manufacturer: { $regex: pattern, $options: 'i' } }
       ];
     }
 
-    if (category && category !== 'All') {
-      filter.category = category;
+    // Ignore case: the frontend sends "Anime", some records say "anime"
+    if (category !== 'All') {
+      filter.category = { $regex: `^${escapeRegex(category)}$`, $options: 'i' };
     }
 
     const db = client.db('FigurinesDB');

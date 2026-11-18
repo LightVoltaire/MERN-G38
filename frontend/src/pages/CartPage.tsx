@@ -3,45 +3,40 @@ import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { getSession } from '../utils/session';
 import type { CartItem } from '../types/shop';
+import { buildPath } from '../utils/buildPath';
 
 export default function CartPage() {
   const session = getSession();
   const userId = session?.userId ?? '';
-  const apiBase = import.meta.env.VITE_API_BASE_URL || '';
 
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkoutMsg, setCheckoutMsg] = useState('');
-
-  const fetchCart = async () => {
-    if (!userId) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`${apiBase}/api/cart/${userId}`);
-      if (res.ok) {
-        const data: CartItem[] = await res.json();
-        setItems(data);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Bumped after removing an item, to reload the cart
+  const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
-    fetchCart();
-  }, [userId]);
+    if (!userId) return;
+    let stale = false;
+    fetch(buildPath(`api/cart/${userId}`))
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: CartItem[]) => { if (!stale) setItems(data); })
+      .catch(() => {})
+      .finally(() => { if (!stale) setLoading(false); });
+    return () => { stale = true; };
+  }, [userId, refresh]);
 
   const handleRemove = async (figureId: string) => {
-    await fetch(`${apiBase}/api/cart/remove`, {
+    await fetch(buildPath('api/cart/remove'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, figureId }),
     });
-    await fetchCart();
+    setRefresh((n) => n + 1);
   };
 
   const handleCheckout = async () => {
-    const res = await fetch(`${apiBase}/api/cart/checkout`, {
+    const res = await fetch(buildPath('api/cart/checkout'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId }),
@@ -98,7 +93,7 @@ export default function CartPage() {
                 >
                   <div className="d-flex align-items-center gap-3">
                     <img
-                      src={`${apiBase}${figure.imageUrl}`}
+                      src={buildPath(figure.imageUrl)}
                       alt={figure.name}
                       className="bg-white border rounded p-1"
                       style={{ width: '68px', height: '68px', objectFit: 'contain' }}

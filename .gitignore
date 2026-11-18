@@ -10,6 +10,18 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+
+# Secrets: never commit these. Copy backend/.env.example to backend/.env instead.
+.env
+!.env.example
+!frontend/.env.development
+!frontend/.env.production
+
+# Figure pictures uploaded through the shop
+backend/uploads/
+
+# Vite's dependency cache
+.vite
 *.local
 
 # Editor directories and files

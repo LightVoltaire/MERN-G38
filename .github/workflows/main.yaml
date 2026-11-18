@@ -10,6 +10,11 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
+    # The React app lives in frontend/, so every "run:" step starts there
+    defaults:
+      run:
+        working-directory: frontend
+
     # Repository secrets (Settings > Secrets and variables > Actions), the
     # same three as the backend's deploy workflow:
     #   SSH_HOST         the droplet's IP address
@@ -34,6 +39,7 @@ jobs:
         with:
           node-version: 26
           cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci

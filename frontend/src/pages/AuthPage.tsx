@@ -1,27 +1,34 @@
-import { setSession } from '../utils/session';
-import { useState, FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { setSession } from '../utils/session';
+import { buildPath } from '../utils/buildPath';
 
 export default function AuthPage() {
   const [isRegister, setIsRegister] = useState(false);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const apiBase = import.meta.env.VITE_API_URL || '';
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
 
-    const endpoint = isRegister ? '/api/register' : '/api/login';
+    const endpoint = isRegister ? 'api/register' : 'api/login';
+    const payload = isRegister
+      ? { firstName, lastName, email, username, password }
+      : { username, password };
+
     try {
-      const res = await fetch(`${apiBase}${endpoint}`, {
+      const res = await fetch(buildPath(endpoint), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify(payload),
       });
+
       const data = await res.json();
 
       if (!res.ok) {
@@ -29,10 +36,16 @@ export default function AuthPage() {
         return;
       }
 
-      setSession({ userId: data.userId, username: data.username });
+      const userId = data.userId ?? data.id ?? data._id;
+      if (!userId) {
+        setError('The API response did not include a valid user id.');
+        return;
+      }
+
+      setSession({ userId, username: data.username ?? username });
       navigate('/home');
     } catch {
-      setError('Server connection error.');
+      setError('Server connection error. Please ensure the backend is running.');
     }
   };
 
@@ -66,26 +79,33 @@ export default function AuthPage() {
         </ul>
 
         <form onSubmit={handleSubmit}>
+          {isRegister && (
+            <>
+              <div className="mb-3">
+                <label className="form-label">First Name</label>
+                <input type="text" className="form-control" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+              </div>
+              <div className="mb-3">
+                <label className="form-label">Last Name</label>
+                <input type="text" className="form-control" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+              </div>
+              <div className="mb-3">
+                <label className="form-label">Email</label>
+                <input type="email" className="form-control" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              </div>
+            </>
+          )}
+
           <div className="mb-3">
             <label className="form-label">Username</label>
-            <input
-              type="text"
-              className="form-control"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
+            <input type="text" className="form-control" value={username} onChange={(e) => setUsername(e.target.value)} required />
           </div>
+
           <div className="mb-3">
             <label className="form-label">Password</label>
-            <input
-              type="password"
-              className="form-control"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <input type="password" className="form-control" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
+
           <button type="submit" className="btn btn-dark w-100">
             {isRegister ? 'Create Account' : 'Enter Secret Shop'}
           </button>
